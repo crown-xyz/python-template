@@ -96,6 +96,7 @@ class CrownClient:
         *,
         source_amount: str | None = None,
         target_amount: str | None = None,
+        trade_reason: str | None = None,
     ) -> dict:
         """Create a conversion quote. Provide either source_amount or target_amount."""
         body: dict = {
@@ -106,6 +107,8 @@ class CrownClient:
             body["source-amount"] = source_amount
         if target_amount is not None:
             body["target-amount"] = target_amount
+        if trade_reason is not None:
+            body["trade-reason"] = trade_reason
         return self._post("/api/v0/quotes", body)
 
     # ------------------------------------------------------------------
@@ -126,16 +129,20 @@ class CrownClient:
         *,
         source_wallet_address: str | None = None,
         target_wallet_address: str | None = None,
+        target_end_user_pix_key: str | None = None,
     ) -> dict:
         """Create an order from an accepted quote.
 
         Wallet addresses are required only for token assets.
+        For off-ramp orders settling to PIX, pass ``target_end_user_pix_key``.
         """
         body: dict = {"quote-id": quote_id}
         if source_wallet_address is not None:
             body["source-wallet-address"] = source_wallet_address
         if target_wallet_address is not None:
             body["target-wallet-address"] = target_wallet_address
+        if target_end_user_pix_key is not None:
+            body["target-end-user-pix-key"] = target_end_user_pix_key
         return self._post("/api/v0/orders", body)
 
     # ------------------------------------------------------------------
