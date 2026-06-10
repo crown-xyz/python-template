@@ -52,16 +52,48 @@ python main.py
 
 `main.py` demonstrates calling the available API endpoints. Edit it to enable or adjust the examples as needed.
 
+### Partner accounts
+
+`test-partner.py` demonstrates the v1 partner account API (sub-account management and account-scoped operations):
+
+```bash
+# Create two sub-accounts (with declared external wallets) and Crown wallets
+python test-partner.py -c
+
+# Run quote/order flows against existing sub-accounts
+python test-partner.py -e SUB_ACCOUNT_ID [SUB_ACCOUNT_ID_2]
+
+# Auto mint: BRL -> BRLV order funded by a dynamic PIX brcode
+python test-partner.py -m SUB_ACCOUNT_ID
+```
+
+### Examples
+
+Standalone, single-purpose scripts live in `examples/`. They take every
+input from environment variables — tax ids, wallets and account ids are
+sensitive, so there are no in-code defaults:
+
+```bash
+# Create one sub-account (SUB_TAX_ID, SUB_TAX_DOCUMENT_TYPE, ...)
+python examples/create_subaccount.py
+
+# Mint BRLV funded by a dynamic PIX brcode (SUB_ACCOUNT_ID, TARGET_BRLV_WALLET, MINT_AMOUNT)
+python examples/mint_via_qrcode.py
+```
+
+See `.env.example` for the full variable list per script.
+
 ## Project Structure
 
 ```
 ├── .env.example        # Environment variable template
 ├── main.py             # Usage examples
+├── test-partner.py     # Partner account (v1) examples
 ├── pyproject.toml      # Project metadata and dependencies
 └── crown/
     ├── __init__.py
     ├── auth.py         # JWT signing (RS256)
-    └── client.py       # CrownClient with all API methods
+    └── client.py       # CrownClient and AccountClient with all API methods
 ```
 
 ## Available Methods
@@ -85,3 +117,9 @@ python main.py
 | `list_claims()` | List all claims |
 | `simulate_claims()` | Get claimable operations |
 | `create_claim(...)` | Execute claims |
+| `list_sub_accounts()` | List the partner's sub-accounts |
+| `create_sub_account(...)` | Request creation of a sub-account |
+| `get_account(id)` | Get an account by id |
+| `account(id)` | Get an `AccountClient` scoped to one account |
+
+`AccountClient` (from `client.account(account_id)`) exposes the account-scoped v1 endpoints: `get()`, `get_balance(asset)`, `list_deposits(asset)`, `get_pix_deposit()`, `list_wallets()`, `create_wallet(name, chain)`, `create_quote(...)`, `list_orders()`, `get_order(id)`, `create_order(...)`, `list_transfers()`, `create_transfer(...)`, `list_withdrawals()`, and `get_withdrawal(id)`.

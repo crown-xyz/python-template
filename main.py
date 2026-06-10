@@ -14,6 +14,7 @@ Wallet addresses and PIX keys are read from environment variables:
     - EXTERNAL_WHITELISTED_WALLET : destination wallet for BRL->BRLV
 """
 
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ from dotenv import load_dotenv
 from crown import CrownClient
 
 load_dotenv()
+logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
 
 client = CrownClient(
     api_key=os.environ["CROWN_API_KEY"],
