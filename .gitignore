@@ -1,5 +1,7 @@
 .env
 *.pem
+qrcode.html
+mint-qrcode.html
 __pycache__/
 *.pyc
 .venv/

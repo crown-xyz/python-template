@@ -52,24 +52,28 @@ python main.py
 
 `main.py` demonstrates calling the available API endpoints. Edit it to enable or adjust the examples as needed.
 
-### Partner accounts
+### Partner account examples
 
-`test-partner.py` demonstrates the v1 partner account API (sub-account management and account-scoped operations):
+Standalone, single-purpose scripts for the v1 partner account API live in
+`examples/`. They take every input from environment variables — tax ids,
+wallets and account ids are sensitive, so there are no in-code defaults:
 
 ```bash
-# Create two sub-accounts (with declared external wallets) and Crown wallets
-python test-partner.py -c
+# Create one sub-account (SUB_TAX_ID, SUB_TAX_DOCUMENT_TYPE, ...)
+python examples/create_subaccount.py
 
-# Run quote/order flows against existing sub-accounts
-python test-partner.py -e SUB_ACCOUNT_ID [SUB_ACCOUNT_ID_2]
+# Mint BRLV funded by a dynamic PIX brcode (SUB_ACCOUNT_ID, TARGET_BRLV_WALLET, MINT_AMOUNT)
+python examples/mint_via_qrcode.py
 ```
+
+See `.env.example` for the full variable list per script.
 
 ## Project Structure
 
 ```
 ├── .env.example        # Environment variable template
 ├── main.py             # Usage examples
-├── test-partner.py     # Partner account (v1) examples
+├── examples/           # Partner account (v1) examples
 ├── pyproject.toml      # Project metadata and dependencies
 └── crown/
     ├── __init__.py

@@ -137,11 +137,14 @@ class CrownClient:
         source_wallet_address: str | None = None,
         target_wallet_address: str | None = None,
         target_end_user_pix_key: str | None = None,
+        source_payment_method: str | None = None,
     ) -> dict:
         """Create an order from an accepted quote.
 
         Wallet addresses are required only for token assets.
         For off-ramp orders settling to PIX, pass ``target_end_user_pix_key``.
+        Pass ``source_payment_method="dynamic-brcode"`` on a BRL->BRLV order
+        to fund it via a one-time PIX QR instead of the account's BRL balance.
         """
         body: dict = {"quote-id": quote_id}
         if source_wallet_address is not None:
@@ -150,6 +153,8 @@ class CrownClient:
             body["target-wallet-address"] = target_wallet_address
         if target_end_user_pix_key is not None:
             body["target-end-user-pix-key"] = target_end_user_pix_key
+        if source_payment_method is not None:
+            body["source-payment-method"] = source_payment_method
         return self._post("/api/v0/orders", body)
 
     # ------------------------------------------------------------------
@@ -432,8 +437,15 @@ class AccountClient:
         source_wallet_address: str | None = None,
         target_wallet_address: str | None = None,
         target_end_user_pix_key: str | None = None,
+        source_payment_method: str | None = None,
     ) -> dict:
-        """Create an order for this account from an accepted quote."""
+        """Create an order for this account from an accepted quote.
+
+        Pass ``source_payment_method="dynamic-brcode"`` on a BRL->BRLV order
+        to fund it via a one-time PIX QR instead of the account's BRL
+        balance; the order response then carries ``brcode``, ``picture-url``
+        and ``expiration``, and the mint proceeds once the brcode is paid.
+        """
         body: dict = {"quote-id": quote_id}
         if source_wallet_address is not None:
             body["source-wallet-address"] = source_wallet_address
@@ -441,6 +453,8 @@ class AccountClient:
             body["target-wallet-address"] = target_wallet_address
         if target_end_user_pix_key is not None:
             body["target-end-user-pix-key"] = target_end_user_pix_key
+        if source_payment_method is not None:
+            body["source-payment-method"] = source_payment_method
         return self._client._post(f"{self._prefix}/orders", body)
 
     # ------------------------------------------------------------------
