@@ -10,17 +10,23 @@ account-scoped quotes/orders. Two modes:
     # Run the order flows against existing sub-accounts
     python test-partner.py -e SUB_ACCOUNT_ID [SUB_ACCOUNT_ID_2]
 
+    # Auto mint: BRL -> BRLV order funded by a dynamic PIX brcode
+    python test-partner.py -m SUB_ACCOUNT_ID
+
 Setup:
     1. Copy .env.example to .env and fill in your credentials
     2. Place your private key PEM file at the configured path
     3. pip install -e .
 
-Environment variables:
-    - SUB1_TAX_ID / SUB2_TAX_ID : tax ids used by -c (required; PII, so
-      there are no in-code defaults)
-    - PARTNER_ACCOUNT_ID : partner (parent) account id (optional)
-    - SUB1_BRLV_WALLET / SUB1_USDC_WALLET : wallets used by -e (optional;
-      when unset, the script discovers them from the sub-account)
+Environment variables (tax ids, wallets and account ids are real,
+sensitive values — there are no in-code defaults):
+    - SUB1_TAX_ID / SUB2_TAX_ID : tax ids used by -c (required)
+    - SUB1_EXTERNAL_WALLET / SUB2_EXTERNAL_WALLET : external wallets
+      declared at creation time by -c (required)
+    - PARTNER_ACCOUNT_ID : partner (parent) account id (required by -e)
+    - SUB1_BRLV_WALLET / SUB1_USDC_WALLET : wallets used by -e and -m
+      (optional; when unset, the script discovers them from the sub-account)
+    - MINT_AMOUNT : BRL amount for the -m auto mint (default 4.00)
 """
 
 import argparse
@@ -38,13 +44,9 @@ from crown import CrownClient
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="[%(name)s] %(message)s")
 
-PARTNER_ACCOUNT_ID = os.environ.get(
-    "PARTNER_ACCOUNT_ID", "01993e4b-ed20-705e-9bab-a97e99e736ab"
-)
-
-# External wallets declared on the sub-accounts at creation time (-c).
-SUB1_EXTERNAL_WALLET = "0x14B925d94cB1173586eBF268dd7a9BEd851e34ad"
-SUB2_EXTERNAL_WALLET = "0x6d583d3e9E728C1D8c986f8Ff9fC1e45a99CfB4c"
+# Account ids, tax ids and wallet addresses are real, sensitive values:
+# they must come from the environment, never from code.
+PARTNER_ACCOUNT_ID = os.environ.get("PARTNER_ACCOUNT_ID")
 
 
 def show(label, fn, *args, **kwargs):
@@ -73,17 +75,16 @@ def find_wallet_address(account, asset):
 def create_sub_accounts(client):
     """Create two sub-accounts, each with a declared external wallet and a
     Crown wallet."""
-    # Tax ids are PII: they must come from the environment, never from code.
     subs = [
         {
             "label": "sub-account 1",
             "tax_id": os.environ["SUB1_TAX_ID"],
-            "external_wallet": SUB1_EXTERNAL_WALLET,
+            "external_wallet": os.environ["SUB1_EXTERNAL_WALLET"],
         },
         # {
         #     "label": "sub-account 2",
         #     "tax_id": os.environ["SUB2_TAX_ID"],
-        #     "external_wallet": SUB2_EXTERNAL_WALLET,
+        #     "external_wallet": os.environ["SUB2_EXTERNAL_WALLET"],
         # },
     ]
 
@@ -127,11 +128,75 @@ def create_sub_accounts(client):
 
 
 # ----------------------------------------------------------------------------
+# -m : auto mint funded by a dynamic PIX brcode
+# ----------------------------------------------------------------------------
+
+
+def auto_mint(client, sub_account_id):
+    """Create a BRL -> BRLV order funded by a dynamic PIX brcode and print
+    the brcode payload to copy and pay. The mint proceeds once it is paid."""
+    sub = client.account(sub_account_id)
+
+    brlv_wallet = os.environ.get("SUB1_BRLV_WALLET") or find_wallet_address(
+        sub, "eth-base/brlv"
+    )
+    if not brlv_wallet:
+        print("No BRLV wallet found for the sub-account; aborting.")
+        return
+    print(f"Target BRLV wallet: {brlv_wallet}")
+
+    amount = os.environ.get("MINT_AMOUNT", "4.00")
+    quote = show(
+        f"BRL -> BRLV quote ({amount})",
+        sub.create_quote,
+        source_asset="fiat/brl",
+        target_asset="eth-base/brlv",
+        source_amount=amount,
+    )
+    if not quote:
+        return
+
+    result = show(
+        "BRL -> BRLV auto-mint order (dynamic brcode)",
+        sub.create_order,
+        quote["id"],
+        target_wallet_address=brlv_wallet,
+        source_payment_method="dynamic-brcode",
+    )
+    if not result:
+        return
+
+    order = result.get("order", {})
+    brcode = order.get("brcode")
+    if not brcode:
+        print("\nOrder created but no brcode in the response — is the "
+              "environment running the automint feature?")
+        return
+
+    print("\n" + "=" * 76)
+    print("PIX brcode — copy and pay:")
+    print("=" * 76)
+    print(brcode)
+    print("=" * 76)
+    if order.get("picture-url"):
+        print(f"QR image:   {order['picture-url']}")
+    if order.get("expiration"):
+        print(f"Expires at: {order['expiration']}")
+    print(f"Order id:   {order.get('id')}")
+    print(f"\nAfter paying, check the order with:")
+    print(f"    python test-partner.py -e {sub_account_id}")
+
+
+# ----------------------------------------------------------------------------
 # -e : execute orders for sub-accounts
 # ----------------------------------------------------------------------------
 
 
 def execute_orders(client, sub_account_ids):
+    if not PARTNER_ACCOUNT_ID:
+        print("PARTNER_ACCOUNT_ID is required for -e; set it in the environment.")
+        return
+
     sub1_id = sub_account_ids[0]
     sub2_id = sub_account_ids[1] if len(sub_account_ids) > 1 else None
 
@@ -272,6 +337,13 @@ def main():
         metavar="SUB_ACCOUNT_ID",
         help="run the order flows for the given sub-account ids",
     )
+    group.add_argument(
+        "-m",
+        "--auto-mint",
+        metavar="SUB_ACCOUNT_ID",
+        help="create a BRL->BRLV order funded by a dynamic PIX brcode "
+        "and print the brcode to pay",
+    )
     args = parser.parse_args()
 
     client = CrownClient(
@@ -282,6 +354,8 @@ def main():
 
     if args.create_sub_accounts:
         create_sub_accounts(client)
+    elif args.auto_mint:
+        auto_mint(client, args.auto_mint)
     else:
         execute_orders(client, args.execute_orders)
 

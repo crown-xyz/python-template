@@ -62,7 +62,26 @@ python test-partner.py -c
 
 # Run quote/order flows against existing sub-accounts
 python test-partner.py -e SUB_ACCOUNT_ID [SUB_ACCOUNT_ID_2]
+
+# Auto mint: BRL -> BRLV order funded by a dynamic PIX brcode
+python test-partner.py -m SUB_ACCOUNT_ID
 ```
+
+### Examples
+
+Standalone, single-purpose scripts live in `examples/`. They take every
+input from environment variables — tax ids, wallets and account ids are
+sensitive, so there are no in-code defaults:
+
+```bash
+# Create one sub-account (SUB_TAX_ID, SUB_TAX_DOCUMENT_TYPE, ...)
+python examples/create_subaccount.py
+
+# Mint BRLV funded by a dynamic PIX brcode (SUB_ACCOUNT_ID, TARGET_BRLV_WALLET, MINT_AMOUNT)
+python examples/mint_via_qrcode.py
+```
+
+See `.env.example` for the full variable list per script.
 
 ## Project Structure
 
